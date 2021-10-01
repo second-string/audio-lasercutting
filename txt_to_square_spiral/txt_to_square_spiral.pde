@@ -4,36 +4,44 @@ import processing.pdf.*;
 public static final int SECS_PER_MIN = 60;
 public static final int PX_PER_IN = 72;  // Scale factor of vectors, default 72 dpi (not sure about this one)
 
-// Audio params
-float sampling_rate_hz = 44100; // Sampling rate that wav file exported at
+// ---------- PER-SONG PARAMS ----------
+// You will need to change or tweak these for every new song cut you're doing
 
-// Laser cutter params
+String input_filename = "walk_in_the_park.txt";
+float waveform_amplitude_pixels = 30; // Total amplitude of audio waveform to scale to
+float distance_between_points_pixels = 0.3;   // Number of pixels between each vertex plotted
+int data_increment = 40;      // Number of entries to move in the data array each time we go to draw another point
+boolean include_cutlines = true;
+boolean split_into_smaller_files = true;    // Set to true to create lots of multiple files w/ 4 spirals each instead of one monster. Useful for illustrator or some laser cutters that barf on files w/ ton of vertices in it
+
+// ---------- END PER-SONG PARAMS
+
+
+// ---------- Audio params ----------
+float sampling_rate_hz = 44100; // Sampling rate that wav file exported at
+// ---------- End Audio params ----------
+
+// ---------- Laser cutter params ----------
+// Only change thsee to adapt code to new laser cutter. Should stay constant after that
 float laser_cutter_dpi = 1200;  // DPI of laser cutter being used
 int cutter_width_in = 36;
 int cutter_height_in = 24;
 float min_point_to_point_distance_pixels = 6.0;  // Minimum distance between vector points to prevent laser cutter from stalling
+int spirals_in_file = 20;      // If split_into_smaller_files is true, this will draw this many spiral rotations in each pdf/svg file. Smaller number means quicker cuts on a laser cutter if you need to stop partway through the full spiral
+// ---------- End Laser cutter params ----------
+
+// ---------- Drawing params ----------
 int cut_side_length_in = 12;       // Finished piece width / height
 float distance_from_edge_in = 0.0;    // Distance from edge of bed to top and left side of square cut, inches
-boolean split_into_smaller_files = true;    // Set to true to create lots of smaller files w/ 4 spirals each instead of one monster. Useful for some laser cutters that can't handle the big file
-int spirals_in_file = 20;      // If split_into_smaller_files is true, this will draw this many spiral rotations in each pdf/svg file. Smaller number means quicker cuts on a laser cutter if you need to stop partway through the full spiral
+int side_buffer_pixels = 50;        // Number of pixels on either side to leave between edge and beginning/end of waveform
+int vertical_buffer_pixels = 50;
+float spiral_spacing_pixels = 20;    // TODO :: calculate spiral_spacing_pixels to dynamically size spiral based on nubmer of points to plot so it always starts at the origin and ends at a specific radius from center
+// ---------- End Drawing params ----------
 
-// Drawing params
-float waveform_amplitude_pixels = 28; // Total amplitude of audio waveform to scale to
-float distance_between_points_pixels = 0.25;   // Number of pixels between each vertex plotted
-int side_buffer_pixels = 50;        // Number of pixels on either side to leave between edge and beginning/end of waveform. Top/bottom spacing smaller
-int vertical_buffer_pixels = 50;    // because it will be additionally offset by half of a line_spacing_pixel amount
-boolean include_cutlines = true;
-// TODO :: bug with certain increment sizes causing iterations_per_side to end up negative, thus never incrementing data_index, thus never exiting while loop
-// Number of entries to move in the data array each time we go to draw another point
- int data_increment = 30;
 
-// TODO :: calculate spiral_spacing_pixels to dynamically size spiral based on nubmer of points to plot so it always starts at the origin and ends at a specific radius from center
-float spiral_spacing_pixels = 20;
 
 
 void setup() {
-    String input_filename = "notion.txt";
-
     // Scale distances in pixels to correct vector positioning
     waveform_amplitude_pixels = waveform_amplitude_pixels / laser_cutter_dpi * PX_PER_IN;
     min_point_to_point_distance_pixels = min_point_to_point_distance_pixels / laser_cutter_dpi * PX_PER_IN;
@@ -84,7 +92,8 @@ void setup() {
     int spiral_side_being_drawn = 0;
     int spiral_count = 0;
     
-    while (data_index < song_data.length) {
+    int song_data_length = song_data.length;
+    while (data_index < song_data_length) {
         // Illustrator only supports 32k points in a single vector, so chop it up every spiral
         // https://community.adobe.com/t5/illustrator/maximum-anchor-points-on-a-path/m-p/10163260
         if (spiral_side_being_drawn == 0) {
@@ -117,6 +126,7 @@ void setup() {
         if (iterations_per_side < 0) {
           // Should be unnecessary once/if we calculate distance between lines based on song data length
           println("iterations_per_side has gone negative, exiting before printing all song data");
+          println("Made it " + ((float)(index_to_use * 100) / song_data_length) + "% through song data");
           break;
         }
       
@@ -195,11 +205,11 @@ void setup() {
 
           // Only draw this point if it's greater than our min supported distance
           distance_squared = distance_between_points_squared(x_pos, y_pos, previous_x_pos, previous_y_pos);
-          if (distance_squared >= (min_point_to_point_distance_pixels * min_point_to_point_distance_pixels)) {
+          //if (distance_squared >= (min_point_to_point_distance_pixels * min_point_to_point_distance_pixels)) {
               vertex(x_pos, y_pos);
               previous_x_pos = x_pos;
               previous_y_pos = y_pos;
-          }
+          //}
 
           data_index += data_increment;
         }
