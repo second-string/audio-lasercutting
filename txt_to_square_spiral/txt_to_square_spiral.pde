@@ -7,12 +7,12 @@ public static final int PX_PER_IN = 72;  // Scale factor of vectors, default 72 
 // ---------- PER-SONG PARAMS ----------
 // You will need to change or tweak these for every new song cut you're doing
 
-String input_filename = "walk_in_the_park.txt";
-float waveform_amplitude_pixels = 30; // Total amplitude of audio waveform to scale to
-float distance_between_points_pixels = 0.3;   // Number of pixels between each vertex plotted
-int data_increment = 40;      // Number of entries to move in the data array each time we go to draw another point
+String input_filename = "gypsy_fleetwood_mac.txt";
+float waveform_amplitude_pixels = 80; // Total amplitude of audio waveform to scale to
+float distance_between_points_pixels = 0.4;   // Number of pixels between each vertex plotted
+int data_increment = 7;      // Number of entries to move in the data array each time we go to draw another point
 boolean include_cutlines = true;
-boolean split_into_smaller_files = true;    // Set to true to create lots of multiple files w/ 4 spirals each instead of one monster. Useful for illustrator or some laser cutters that barf on files w/ ton of vertices in it
+boolean split_into_smaller_files = false;    // Set to true to create lots of multiple files w/ 4 spirals each instead of one monster. Useful for illustrator or some laser cutters that barf on files w/ ton of vertices in it
 
 // ---------- END PER-SONG PARAMS
 
