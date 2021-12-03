@@ -45,7 +45,8 @@ frameInt = map(ord, list(frame))#turn into array
 
 #separate left and right channels and merge bytes
 frameOneChannel = [0]*numframes#initialize list of one channel of wave
-for i in range(numframes):
+print("Processing {} total frames, skipping 9 frames for every one processed for an end result of {} data points".format(numframes, numframes / 10))
+for i in range(0, numframes, 10):
     frameOneChannel[i] = frameInt[4*i+1]*2**8+frameInt[4*i]#separate channels and store one channel in new list
     if frameOneChannel[i] > 2**15:
         frameOneChannel[i] = (frameOneChannel[i]-2**16)
@@ -56,7 +57,7 @@ for i in range(numframes):
 
 #convert to string
 audioStr = ''
-for i in range(numframes):
+for i in range(0, numframes, 10):
     audioStr += str(frameOneChannel[i])
     audioStr += ","#separate elements with comma
 
