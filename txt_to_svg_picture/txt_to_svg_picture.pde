@@ -7,15 +7,21 @@ static int PX_PER_IN = 72;                  // Scale factor of vectors, default 
 static int width_in = 12;
 static int height_in = 12;
 
-static int num_interpolated_points = 9;    // Number of points we stick in between each point on svg line given to us by RG getPoints (smallest point space between those points still too big)
+// ---------- PER-SONG PARAMS ----------
 
-// Drawing params
-static float waveform_amplitude_pixels = 1.8; // Total amplitude of audio waveform to scale to
-static int song_data_increment = 14;        // Number of indexes to skip ahead for each song_data point we pull (full array can be in tens of millions)
-//static float min_point_to_point_distance_pixels = 0.1;  // Minimum distance between vector points to prevent laser cutter from stalling
-//static float laser_cutter_dpi = 1200;        // DPI of laser cutter being used
+String song_data_filename = "time_you_and_i.txt";
+String shape_filename = "flow-field-test.svg";
+static int num_interpolated_points = 1;    // Number of points we stick in between each point on svg line given to us by RG getPoints (smallest point space between those points still too big)
+static float waveform_amplitude_pixels = 5.0; // Total amplitude of audio waveform to scale to
+static int song_data_increment = 22;        // Number of indexes to skip ahead for each song_data point we pull (full array can be in tens of millions)
+boolean split_pdfs = true;            // Set to true to create multiple files w/ pieces of image instead of one monster. Useful for illustrator or some laser cutters that barf on files w/ ton of vertices in it
+
+// ---------- END PER-SONG PARAMS ---------
+
+// ---------- INTERNAL GLOBALS ----------
+// Don't touch these, needed to maintain state between iterations of loop()
+
 String base_filename;
-boolean split_pdfs = false;
 int files_created = 0;
 
 float song_data[] = new float[] {};
@@ -28,6 +34,8 @@ int song_data_index = points_index;
 int x_sign;
 int y_sign;
 
+// ---------- END INTERNAL GLOBALS ----------
+
 void setup () {
   // Have to do this bs because you can't pass non-constants to size()
   // Normally we would calc width_px/height_px by multiplying width_in * PX_PER_IN
@@ -35,9 +43,7 @@ void setup () {
   assert(width_in == 12);
   assert(height_in == 12);
   size(864, 864); 
-  
-  String song_data_filename = "time_you_and_i.txt";
-  String shape_filename = "rainier.svg";
+
   
   // Pull in song data in txt form and normalize it
   // Intake csv text, tranform to floats and normalize based on max value and waveform amplitude setting
@@ -72,6 +78,11 @@ void setup () {
     float percent = (float)(abs(diff)) / (song_data_size / song_data_increment);
     println("Able to plot " + (1 - percent) * 100 + "% of song data points.");
     println("Consider increasing num_interpolated_points or song_data_increment or skipping more frames in wav_to_txt.py");
+    if ((1 - percent) < 0.95) {
+      println("Must be able to plot at least 95% of song data, bailing");
+      exit();
+      return;
+    }
   } else {
     float percent = (float)(abs(diff)) / (points.length * num_interpolated_points);
     println("Song data only fills up " + (1 - percent) * 100 + "% of plottable points.");
@@ -88,10 +99,11 @@ void setup () {
   
   base_filename = song_data_filename.substring(0, song_data_filename.lastIndexOf('.')) + "_" + shape_filename.substring(0, shape_filename.lastIndexOf('.')) + "_line_following_";
   beginRecord(PDF, base_filename + (files_created++) + ".pdf");
+  println("Created initial file '" + base_filename + (files_created - 1) + ".pdf'");
   background(255);
   beginShape();
   stroke(0);
-  strokeWeight(0.4);
+  strokeWeight(0.2);
   noFill();
   
   // Assume border (if there is one) is all in front of array. Pre-incrementing our points_index
@@ -107,7 +119,8 @@ void setup () {
 }
 
 void draw() {
-  if (points_index + 1 >= points.length || (song_data_index + num_interpolated_points * song_data_increment) >= song_data_size || points_index < 0) {
+  //if (points_index + 1 >= points.length || (song_data_index + num_interpolated_points * song_data_increment) >= song_data_size || points_index < 0) {
+    if (points_index > 4000) {
     println("Bailing at points_index of " + points_index);
     endShape();
     endRecord();
@@ -174,7 +187,7 @@ void draw() {
     float adj_x = x + (i * x_step_length) + (song_data[song_data_index] * sin(angle));
     float adj_y = y - (i * y_step_length) + (song_data[song_data_index] * cos(angle));
     
-    vertex(adj_x, adj_y);
+    vertex(adj_x, adj_y); //<>//
     song_data_index += song_data_increment;
   }
 

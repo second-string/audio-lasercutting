@@ -45,7 +45,7 @@ frameInt = map(ord, list(frame))#turn into array
 
 #separate left and right channels and merge bytes
 frameOneChannel = [0]*numframes#initialize list of one channel of wave
-print("Processing {} total frames, skipping 9 frames for every one processed for an end result of {} data points".format(numframes, numframes / 10))
+print("Processing {} total frames, skipping 10 frames for every one processed for an end result of {} data points".format(numframes, numframes / 10))
 for i in range(0, numframes, 10):
     frameOneChannel[i] = frameInt[4*i+1]*2**8+frameInt[4*i]#separate channels and store one channel in new list
     if frameOneChannel[i] > 2**15:

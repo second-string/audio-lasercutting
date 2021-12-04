@@ -1,32 +1,25 @@
 import processing.svg.*;
 import processing.pdf.*;
 
-public static final int SECS_PER_MIN = 60;
 public static final int PX_PER_IN = 72;  // Scale factor of vectors, default 72 dpi (not sure about this one)
 
 // ---------- PER-SONG PARAMS ----------
 // You will need to change or tweak these for every new song cut you're doing
 
-String input_filename = "gypsy_fleetwood_mac.txt";
-float waveform_amplitude_pixels = 80; // Total amplitude of audio waveform to scale to
-float distance_between_points_pixels = 0.4;   // Number of pixels between each vertex plotted
-int data_increment = 7;      // Number of entries to move in the data array each time we go to draw another point
+String input_filename = "dark_star_live_at_fillmore_east.txt";
+float waveform_amplitude_pixels = 6; // Total amplitude of audio waveform to scale to
+float distance_between_points_pixels = 0.3;   // Number of pixels between each vertex plotted
+int data_increment = 22;      // Number of entries to move in the data array each time we go to draw another point
 boolean include_cutlines = true;
-boolean split_into_smaller_files = false;    // Set to true to create lots of multiple files w/ 4 spirals each instead of one monster. Useful for illustrator or some laser cutters that barf on files w/ ton of vertices in it
+boolean split_into_smaller_files = true;    // Set to true to create lots of multiple files w/ 4 spirals each instead of one monster. Useful for illustrator or some laser cutters that barf on files w/ ton of vertices in it
 
 // ---------- END PER-SONG PARAMS
 
-
-// ---------- Audio params ----------
-float sampling_rate_hz = 44100; // Sampling rate that wav file exported at
-// ---------- End Audio params ----------
-
 // ---------- Laser cutter params ----------
 // Only change thsee to adapt code to new laser cutter. Should stay constant after that
-float laser_cutter_dpi = 1200;  // DPI of laser cutter being used
 int cutter_width_in = 36;
 int cutter_height_in = 24;
-float min_point_to_point_distance_pixels = 6.0;  // Minimum distance between vector points to prevent laser cutter from stalling
+float min_point_to_point_distance_pixels = 0.3;  // Minimum distance between vector points to prevent laser cutter from stalling
 int spirals_in_file = 20;      // If split_into_smaller_files is true, this will draw this many spiral rotations in each pdf/svg file. Smaller number means quicker cuts on a laser cutter if you need to stop partway through the full spiral
 // ---------- End Laser cutter params ----------
 
@@ -42,12 +35,8 @@ float spiral_spacing_pixels = 20;    // TODO :: calculate spiral_spacing_pixels 
 
 
 void setup() {
-    // Scale distances in pixels to correct vector positioning
-    waveform_amplitude_pixels = waveform_amplitude_pixels / laser_cutter_dpi * PX_PER_IN;
-    min_point_to_point_distance_pixels = min_point_to_point_distance_pixels / laser_cutter_dpi * PX_PER_IN;
-
     // Intake csv text, tranform to floats and normalize based on max value and waveform amplitude setting
-    float[] song_data = process_audio_text_file(input_filename);
+    float[] song_data = process_audio_text_file(input_filename); //<>//
 
     // Build output filename
     String output_filename = input_filename;
@@ -113,7 +102,7 @@ void setup() {
             // offset each successively smaller squre manually in the cutter settings
             background(255);
             noFill();
-            strokeWeight(0.5);
+            strokeWeight(0.3);
             stroke(255, 0, 0);
           }
           beginShape();
