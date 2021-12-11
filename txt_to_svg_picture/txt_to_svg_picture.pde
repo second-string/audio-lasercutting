@@ -1,20 +1,24 @@
 import geomerative.*;
 import processing.pdf.*;
 
-// https://discourse.processing.org/t/calculate-distance-from-point-to-closest-point-of-shape/7201/7
+public enum CutMode {
+  LASER_CUTTING,
+  MILLING,
+};
 
 static int PX_PER_IN = 72;                  // Scale factor of vectors, default 72 dpi (not sure about this one)
-static int width_in = 12;
-static int height_in = 12;
+static float mill_tip_diameter_in = 0.06;
+static float mill_tip_diameter_px = mill_tip_diameter_in * PX_PER_IN;
 
 // ---------- PER-SONG PARAMS ----------
 
 String song_data_filename = "time_you_and_i.txt";
-String shape_filename = "flow-field-test.svg";
+String shape_filename = "flow-field-crop.svg";
+CutMode mode = CutMode.MILLING;
+boolean split_pdfs = false;            // Set to true to create multiple files w/ pieces of image instead of one monster. Useful for illustrator or some laser cutters that barf on files w/ ton of vertices in it
+
 static int num_interpolated_points = 1;    // Number of points we stick in between each point on svg line given to us by RG getPoints (smallest point space between those points still too big)
-static float waveform_amplitude_pixels = 5.0; // Total amplitude of audio waveform to scale to
-static int song_data_increment = 22;        // Number of indexes to skip ahead for each song_data point we pull (full array can be in tens of millions)
-boolean split_pdfs = true;            // Set to true to create multiple files w/ pieces of image instead of one monster. Useful for illustrator or some laser cutters that barf on files w/ ton of vertices in it
+static int song_data_increment = 50;        // Number of indexes to skip ahead for each song_data point we pull (full array can be in tens of millions)
 
 // ---------- END PER-SONG PARAMS ---------
 
@@ -24,9 +28,21 @@ boolean split_pdfs = true;            // Set to true to create multiple files w/
 String base_filename;
 int files_created = 0;
 
+static float laser_cutting_waveform_amplitude_pixels = 5.0;
+static float milling_waveform_amplitude_pixels = 40.0;
+float waveform_amplitude_pixels; // Total amplitude of audio waveform to scale to
+
+static int milling_width_in = 24;
+static int milling_height_in = 24;
+static int laser_cutting_width_in = 12;
+static int laser_cutting_height_in = 12;
+static int width_in;
+static int height_in;
+
 float song_data[] = new float[] {};
 int song_data_size;
-RPoint [] points;
+RPoint [] points_full;
+ArrayList<RPoint> points = new ArrayList<RPoint>();
 
 //float song_data[] = new float[song_data_size];
 int points_index = 0;                      // Start with second point to pre-calc the diffs'
@@ -37,12 +53,26 @@ int y_sign;
 // ---------- END INTERNAL GLOBALS ----------
 
 void setup () {
+  switch (mode) {
+    case LASER_CUTTING:
+      waveform_amplitude_pixels = laser_cutting_waveform_amplitude_pixels;
+      width_in = laser_cutting_width_in;
+      height_in = laser_cutting_height_in;
+      break;
+    case MILLING:
+      waveform_amplitude_pixels = milling_waveform_amplitude_pixels;
+      width_in = milling_width_in;
+      height_in = milling_height_in;
+      break;
+  }
+  
   // Have to do this bs because you can't pass non-constants to size()
   // Normally we would calc width_px/height_px by multiplying width_in * PX_PER_IN
   // If you change the values in the asserts, recalculate the values in size() manually
-  assert(width_in == 12);
-  assert(height_in == 12);
-  size(864, 864); 
+  assert(width_in == 24);
+  assert(height_in == 24);
+  //size(2592, 1728);
+  size(1728, 1728); 
 
   
   // Pull in song data in txt form and normalize it
@@ -55,7 +85,7 @@ void setup () {
   
   // Pull in points from base image .svg
   RG.init(this);
-  RShape svg_shape = RG.loadShape (shape_filename);
+  RShape svg_shape = RG.loadShape(shape_filename);
   
   // Scales the svg to the correct width/height, 12in x 12in.
   // This assumes that the input .svg is square already. If not, it
@@ -68,33 +98,39 @@ void setup () {
   svg_shape.scale((width_in * PX_PER_IN) / max_side_length);
   
   RG.setPolygonizerLength(1);
-  points = svg_shape.getPoints();
-  println("Total points from RShape:  " + points.length);
-  println("Total points to print shape after interpolation: " + points.length * num_interpolated_points);
+  //points = svg_shape.getPoints();
+  points_full = svg_shape.getPoints();
+  
+  for (int i = 0; i < points_full.length; i += 3) {
+     points.add(points_full[i]); 
+  }
+  
+  println("Total points from RShape:  " + points.size());
+  println("Total points to print shape after interpolation: " + points.size() * num_interpolated_points);
   println("Total number of song data entries after increment scaling: " + song_data_size / song_data_increment);
 
-  int diff = (song_data_size / song_data_increment) - (points.length * num_interpolated_points);
+  int diff = (song_data_size / song_data_increment) - (points.size() * num_interpolated_points);
   if (diff > 0) {
     float percent = (float)(abs(diff)) / (song_data_size / song_data_increment);
     println("Able to plot " + (1 - percent) * 100 + "% of song data points.");
     println("Consider increasing num_interpolated_points or song_data_increment or skipping more frames in wav_to_txt.py");
     if ((1 - percent) < 0.95) {
       println("Must be able to plot at least 95% of song data, bailing");
-      exit();
-      return;
+      //exit();
+      //return;
     }
   } else {
-    float percent = (float)(abs(diff)) / (points.length * num_interpolated_points);
+    float percent = (float)(abs(diff)) / (points.size() * num_interpolated_points);
     println("Song data only fills up " + (1 - percent) * 100 + "% of plottable points.");
     println("Consider decreasing num_interpolated_points or song_data_increment or skipping less frames in wav_to_txt.py");
-    exit();
-    return;
+    //exit();
+    //return;
   }
   
   if (diff > 20000) {
     println("Gap between shape points and song data greater than 20,000, exiting. Adjust parameters and try again");
-    exit();
-    return;
+    //exit();
+    //return;
   }
   
   base_filename = song_data_filename.substring(0, song_data_filename.lastIndexOf('.')) + "_" + shape_filename.substring(0, shape_filename.lastIndexOf('.')) + "_line_following_";
@@ -103,7 +139,7 @@ void setup () {
   background(255);
   beginShape();
   stroke(0);
-  strokeWeight(0.2);
+  strokeWeight(mill_tip_diameter_px);
   noFill();
   
   // Assume border (if there is one) is all in front of array. Pre-incrementing our points_index
@@ -112,15 +148,16 @@ void setup () {
   float x;
   float y;
   do {
-    x = points[points_index].x;
-    y = points[points_index].y;
+    x = points.get(points_index).x;
+    y = points.get(points_index).y;
     points_index++;    
-  } while (x == 0 || y == 0 || x == width || y == height);
+  } while (x <= 5 || y <= 5 || x >= (width - 5) || y >= (height - 5));
+  println("Starting to plot song_data at first non-border points_index is " + points_index + " holding (x,y) coord of (" + x + ", " + y + ")");
 }
 
 void draw() {
-  //if (points_index + 1 >= points.length || (song_data_index + num_interpolated_points * song_data_increment) >= song_data_size || points_index < 0) {
-    if (points_index > 4000) {
+  if (points_index + 1 >= points.size() || (song_data_index + num_interpolated_points * song_data_increment) >= song_data_size || points_index < 0) {
+    //if (points_index > 3000) {
     println("Bailing at points_index of " + points_index);
     endShape();
     endRecord();
@@ -128,17 +165,17 @@ void draw() {
     return;
   };
   
-  float x = points[points_index].x;
-  float y = points[points_index].y;
-  float next_x = points[points_index + 1].x;
-  float next_y = points[points_index + 1].y;
+  float x = points.get(points_index).x;
+  float y = points.get(points_index).y;
+  float next_x = points.get(points_index + 1).x;
+  float next_y = points.get(points_index + 1).y;
   float point_distance = distance_between_points(next_x, next_y, x, y);
 
   //  "Raise the pen" and move to the next point if we're about to make a big jump,
   // meaning out next point isn't on the continuous line of the originally drawing.
   // Otherwise we get big lines all across the drawing.
-  if (point_distance > 5) {
-    vertex(x, y);
+  if (point_distance > 5) { //<>//
+    vertex(x, y); //<>//
     endShape();
     beginShape();
     points_index++;
@@ -153,14 +190,14 @@ void draw() {
     endShape();
     
     if (split_pdfs && actual_vertices_drawn % 300000 == 0 && song_data_index != 0) {
-      int percent_drawn = (actual_vertices_drawn / (points.length * num_interpolated_points)) * 100;
+      int percent_drawn = (actual_vertices_drawn / (points.size() * num_interpolated_points)) * 100;
       println("New file " + base_filename + (files_created) + ".pdf at total vertices drawn " + actual_vertices_drawn + "(" + percent_drawn + "%)");
       endRecord();
       beginRecord(PDF, base_filename + (files_created++) + ".pdf");
       background(255);
       beginShape();
       stroke(0);
-      strokeWeight(0.1);
+      strokeWeight(mill_tip_diameter_px);
       noFill();
     }
     beginShape();
