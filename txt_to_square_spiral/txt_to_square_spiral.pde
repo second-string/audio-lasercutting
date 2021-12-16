@@ -6,12 +6,11 @@ public static final int PX_PER_IN = 72;  // Scale factor of vectors, default 72 
 // ---------- PER-SONG PARAMS ----------
 // You will need to change or tweak these for every new song cut you're doing
 
-String input_filename = "dark_star_live_at_fillmore_east.txt";
-float waveform_amplitude_pixels = 6; // Total amplitude of audio waveform to scale to
-float distance_between_points_pixels = 0.3;   // Number of pixels between each vertex plotted
-int data_increment = 22;      // Number of entries to move in the data array each time we go to draw another point
+String input_filename = "nothing_is_something_worth_doing.txt";
+float waveform_amplitude_pixels = 7; // Total amplitude of audio waveform to scale to
+float distance_between_points_pixels = 0.5;   // Number of pixels between each vertex plotted
 boolean include_cutlines = true;
-boolean split_into_smaller_files = true;    // Set to true to create lots of multiple files w/ 4 spirals each instead of one monster. Useful for illustrator or some laser cutters that barf on files w/ ton of vertices in it
+boolean split_into_smaller_files = false;    // Set to true to create lots of multiple files w/ 4 spirals each instead of one monster. Useful for illustrator or some laser cutters that barf on files w/ ton of vertices in it
 
 // ---------- END PER-SONG PARAMS
 
@@ -36,7 +35,8 @@ float spiral_spacing_pixels = 20;    // TODO :: calculate spiral_spacing_pixels 
 
 void setup() {
     // Intake csv text, tranform to floats and normalize based on max value and waveform amplitude setting
-    float[] song_data = process_audio_text_file(input_filename); //<>//
+    float[] song_data = process_audio_text_file(input_filename);
+    int song_data_length = song_data.length;
 
     // Build output filename
     String output_filename = input_filename;
@@ -48,6 +48,7 @@ void setup() {
     // Construct output pdf file
     // Must be constant: cutter_width_in * PX_PER_IN, cutter_height_in * PX_PER_IN
     // Changed to 12x12in, no need to make whole thing size of cutter bed
+    assert(cut_side_length_in == 12);
     size(864, 864);
 
     // Point of refernce for all measurements
@@ -58,6 +59,22 @@ void setup() {
      // Number of points on one side of the current spiral. Will need to decrement after 3 sides drawn to spiral inward. Scales based on horizontal increment size
     int iterations_per_side = int((cut_side_length_pixels - 2 * side_buffer_pixels) / distance_between_points_pixels); 
     
+    // Count up how many points we'll plot in this design so we can skip the correct number of song data points each subsequent point plot
+    int temp_iterations_per_side = iterations_per_side;
+    int total_points_to_plot = 0;
+    while (temp_iterations_per_side > 0) {
+      total_points_to_plot += temp_iterations_per_side * 2;
+      temp_iterations_per_side -= spiral_spacing_pixels;
+    }
+
+    println("Total plottable points in this design (give or take): " + total_points_to_plot);
+    println("Total count of song data points: " + song_data_length);
+    
+    // Number of entries to move in the data array each time we go to draw another point
+    int data_increment = (int)Math.floor(song_data_length / total_points_to_plot);
+    println("Skipping every " + data_increment + " song data points to fit in available plottable points");
+
+
     // Spread rows evenly across full height available. line_spacing_pixels is a float to preserve accumulation of decimals in
     // y offset at it's continuosly added to it(see comment above current_draw_y_offset for more info)
     //int rows = (int)Math.ceil((float)song_data.length / data_increment / horizontal_iterations_per_row);
@@ -81,7 +98,6 @@ void setup() {
     int spiral_side_being_drawn = 0;
     int spiral_count = 0;
     
-    int song_data_length = song_data.length;
     while (data_index < song_data_length) {
         // Illustrator only supports 32k points in a single vector, so chop it up every spiral
         // https://community.adobe.com/t5/illustrator/maximum-anchor-points-on-a-path/m-p/10163260
