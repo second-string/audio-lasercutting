@@ -99,7 +99,7 @@ void setup() {
             // Put # in front of filename because lasercutter screen will cut off the end
             beginRecord(PDF, spiral_count / spirals_in_file + "_" + output_filename +  ".pdf");
             // Background call must be here to paint a full width by height background - otherwise you'd need to manually
-            // offset each successively smaller squre manually in the cutter settings
+            // offset each successively smaller squre in the cutter settings
             background(255);
             noFill();
             strokeWeight(0.3);
@@ -153,7 +153,7 @@ void setup() {
             break;
         }
         
-        // for loop iterating through full row of X offsets
+        // for loop iterating through one full side of spiral
         for (int i = 0; i < iterations_per_side; i++) {
           // Check out index each iteration to make sure we don't overflow since we increment in here but the outer while loop has the guard
           if (data_index >= song_data.length) {
