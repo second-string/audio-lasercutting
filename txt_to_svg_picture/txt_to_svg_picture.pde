@@ -6,53 +6,66 @@ public enum CutMode {
   MILLING,
 };
 
-static int PX_PER_IN = 72;                  // Scale factor of vectors, default 72 dpi (not sure about this one)
-static float mill_tip_diameter_in = 0.06;
-static float mill_tip_diameter_px = mill_tip_diameter_in * PX_PER_IN;
-
 // ---------- PER-SONG PARAMS ----------
-
+// Change these to match your files and cut type
 String song_data_filename = "time_you_and_i.txt";
 String shape_filename = "flow-field-crop.svg";
 CutMode mode = CutMode.MILLING;
 boolean split_pdfs = false;            // Set to true to create multiple files w/ pieces of image instead of one monster. Useful for illustrator or some laser cutters that barf on files w/ ton of vertices in it
-
-static int song_data_increment = 50;        // Number of indexes to skip ahead for each song_data point we pull (full array can be in tens of millions)
-static float stroke_weight = 0.2;            // Thickness of line
-boolean split_pdfs = false;            // Set to true to create multiple files w/ pieces of image instead of one monster. Useful for illustrator or some laser cutters that barf on files w/ ton of vertices in it
-
 // ---------- END PER-SONG PARAMS ---------
 
-// ---------- INTERNAL GLOBALS ----------
-// Don't touch these, needed to maintain state between iterations of loop()
 
+// ---------- CONSTANTS ----------
+static int PX_PER_IN = 72;                  // Scale factor of vectors, default 72 dpi (not sure about this one)
+static float mill_tip_diameter_in = 0.06;
+static float mill_tip_diameter_px = mill_tip_diameter_in * PX_PER_IN;
+
+// Milling
+static float milling_waveform_amplitude_pixels = 40.0;
+static int milling_width_in = 24;
+static int milling_height_in = 24;
+static float milling_stroke_weight = mill_tip_diameter_px;
+static float milling_distance_between_points = -1;    // unused for milling
+static int milling_long_jump_threshold_px = PX_PER_IN;
+
+// Laser cutting
+static float laser_cutting_waveform_amplitude_pixels = 5.0;
+static int laser_cutting_width_in = 12;
+static int laser_cutting_height_in = 12;
+static float laser_cutting_stroke_weight = 0.3;
+static float laser_cutting_distance_between_points = 0.3;
+static int laser_cutting_long_jump_threshold_px = 5;
+// ---------- END CONSTANTS ----------
+
+
+// ---------- INTERNAL PARAMS ----------
+// Don't touch these, needed to maintain state between iterations of loop()
+// Shared constants set from milling or laser cutting constants
+float waveform_amplitude_pixels; // Total amplitude of audio waveform to scale to
+int width_in;
+int height_in;
+float stroke_weight;
+float distance_between_points;
+int long_jump_threshold_px;
+
+// Output files
 String base_filename;
 int files_created = 0;
 
-static float laser_cutting_waveform_amplitude_pixels = 5.0;
-static float milling_waveform_amplitude_pixels = 40.0;
-float waveform_amplitude_pixels; // Total amplitude of audio waveform to scale to
-
-static int milling_width_in = 24;
-static int milling_height_in = 24;
-static int laser_cutting_width_in = 12;
-static int laser_cutting_height_in = 12;
-static int width_in;
-static int height_in;
-
+// Song data
 float song_data[] = new float[] {};
 int song_data_increment;
 int song_data_size;
-RPoint [] points_full;
-ArrayList<RPoint> points = new ArrayList<RPoint>();
+int song_data_index = 0;
 
-//float song_data[] = new float[song_data_size];
-int points_index = 0;                      // Start with second point to pre-calc the diffs'
-int song_data_index = points_index;
-int x_sign;
-int y_sign;
-
+// SVG shape data
+RPoint [] points_full;                                  // Holds full array of points received from rshape parse of svg
+ArrayList<RPoint> points = new ArrayList<RPoint>();    // Holds array of points that we'll use plotting. This is identical to points_full for lasercutting, but has points removed for milling
+int points_index = 0;
+int points_size;    // Number of plottable points after milling or interpolation adjustment
+int total_points_to_plot = 0;
 // ---------- END INTERNAL GLOBALS ----------
+
 
 void setup () {
   switch (mode) {
@@ -60,22 +73,37 @@ void setup () {
       waveform_amplitude_pixels = laser_cutting_waveform_amplitude_pixels;
       width_in = laser_cutting_width_in;
       height_in = laser_cutting_height_in;
+      stroke_weight = laser_cutting_stroke_weight;
+      distance_between_points = laser_cutting_distance_between_points;
+      long_jump_threshold_px = laser_cutting_long_jump_threshold_px;
       break;
     case MILLING:
       waveform_amplitude_pixels = milling_waveform_amplitude_pixels;
       width_in = milling_width_in;
       height_in = milling_height_in;
+      stroke_weight = milling_stroke_weight;
+      distance_between_points = milling_distance_between_points;
+      long_jump_threshold_px = milling_long_jump_threshold_px;
       break;
   }
   
   // Have to do this bs because you can't pass non-constants to size()
   // Normally we would calc width_px/height_px by multiplying width_in * PX_PER_IN
   // If you change the values in the asserts, recalculate the values in size() manually
+  if (mode == CutMode.MILLING) {
+    println("In MILLING mode, make sure you've manually set the size(x, y) call to size(" + (width_in * PX_PER_IN) + ", " + (height_in * PX_PER_IN) + ")");
+  } else {
+    println("In LASER_CUTTING mode, make sure you've manually set the size(x, y) call to size(" + (width_in * PX_PER_IN) + ", " + (height_in * PX_PER_IN) + ")");
+  }
+
+  // Processing doesn't even let you put two size() calls in two separate if-blocks
+  //so this one needs to be hand-changed every switch to/from milling/lasercutting mode
   assert(width_in == 24);
   assert(height_in == 24);
-  //size(2592, 1728);
-  size(1728, 1728); 
-
+  size(1728, 1728);
+  //assert(width_in == 12);
+  //assert(height_in == 12);
+  //size(864, 864);
   
   // Pull in song data in txt form and normalize it
   // Intake csv text, tranform to floats and normalize based on max value and waveform amplitude setting
@@ -92,42 +120,53 @@ void setup () {
   float shape_height = svg_shape.getHeight();
   float shape_width = svg_shape.getWidth();
   float max_side_length = shape_height > shape_width ? shape_height : shape_width;
+  if (shape_height != shape_width) {
+    println("WARNING: input svg not square, scaling max side length of " + max_side_length + "px to canvas side length of " + (width_in * PX_PER_IN) + "px");
+  }
   
   // width_in * PX_PER_IN is scaling to same value we passed into size(x,y) at the beginning of setup()
   svg_shape.scale((width_in * PX_PER_IN) / max_side_length);
   
   RG.setPolygonizerLength(1);
-  //points = svg_shape.getPoints();
   points_full = svg_shape.getPoints();
   
-  for (int i = 0; i < points_full.length; i += 3) {
-     points.add(points_full[i]); 
-  }
-  
-  println("Total points from RShape:  " + points.size());
-  println("Total points to print shape after interpolation: " + points.size() * num_interpolated_points);
-
-  int diff = (song_data_size / song_data_increment) - (points.size() * num_interpolated_points);
   // Count up how many points we'll plot in this design so we can skip the correct number of song data points each subsequent point plot
-  int total_points_to_plot = 0;
-  for (int i = 0; i < points.length - 1; i++) {
-    float x = points[i].x;
-    float y = points[i].y;
-    if (x == 0 || y == 0 || x == width || y == height) {
-      continue;
+  if (mode == CutMode.MILLING) {
+    // There is zero interpolation that happens in milling mode - we take points OUT of the shape data to make sure stuff is spaced out enough
+    // TODO :: remove points intelligently based on point-to-point distance instead of just yanking points every X initial points
+    for (int i = 0; i < points_full.length; i += 2) {
+       points.add(points_full[i]); 
     }
     
-    float next_x = points[i + 1].x;
-    float next_y = points[i + 1].y;
-    float point_distance = distance_between_points(next_x, next_y, x, y);
-
-    // Skip the larger distances we'll do jumps for in the draw loop
-    if (point_distance <= 5) {
-      total_points_to_plot += (int)Math.floor(point_distance / distance_between_points);
+    total_points_to_plot = points.size();
+  } else {
+    // Add every point received from shape to points_full. Loop calculations are to determine how many
+    // total points will be plotted with varying interpolation sizes. points_full used for logic/access
+    // since linear array access is faster
+    for (int i = 0; i < points_full.length - 1; i++) {
+      // Add to main points array before anything else
+      RPoint point = points_full[i];
+      points.add(point);
+      float x = point.x;
+      float y = point.y;
+      if (x == 0 || y == 0 || x == width || y == height) {
+        continue;
+      }
+      
+      float next_x = points_full[i + 1].x;
+      float next_y = points_full[i + 1].y;
+      float point_distance = distance_between_points(next_x, next_y, x, y);
+  
+      // Skip the larger distances we'll do jumps for in the draw loop
+      if (point_distance <= 5) {
+        total_points_to_plot += (int)Math.floor(point_distance / distance_between_points);
+      }
     }
   }
-  
-  println("Actual total plottable points after dynamic interpolation based on 'distance_between_points': " + total_points_to_plot);
+ 
+  points_size = points.size();
+  println("Total points from RShape:  " + points_full.length);
+  println("Actual total plottable points after " + (mode == CutMode.MILLING ? "removing shape data points: " : "dynamic interpolation based on 'distance_between_points': ") + total_points_to_plot);
   println("Total count of song data points: " + song_data_size);
   assert(song_data_size >= total_points_to_plot);
 
@@ -144,7 +183,7 @@ void setup () {
   noFill();
   
   // Assume border (if there is one) is all in front of array. Pre-incrementing our points_index
-  //to the start of the real data here lets us avoid an if-check every point increment in the loop below.
+  // to the start of the real data here lets us avoid an if-check every point increment in the loop below.
   // If no border, we lose the first point (meh)
   float x;
   float y;
@@ -158,8 +197,8 @@ void setup () {
 
 void draw() {
   // If we've finished the shape or points_index is negative (?), bail
-  if (points_index + 1 >= points.length || points_index < 0) {
-    //if (points_index > 8000) {
+  if (points_index + 1 >= points_size || points_index < 0) {
+    //if (points_index > 3000) {
     finishAndExit();
     return;
   };
@@ -170,11 +209,11 @@ void draw() {
   float next_y = points.get(points_index + 1).y;
   float point_distance = distance_between_points(next_x, next_y, x, y);
 
-  //  "Raise the pen" and move to the next point if we're about to make a big jump,
-  // meaning out next point isn't on the continuous line of the originally drawing. //<>//
-  // Otherwise we get big lines all across the drawing. //<>//
-  if (point_distance > 5) { //<>//
-    vertex(x, y); //<>//
+  // "Raise the pen" and move to the next point if we're about to make a big jump,
+  // meaning our next point isn't on the continuous line of the originally drawing.
+  // Otherwise we get big lines all across the drawing.
+  if (point_distance > long_jump_threshold_px) {
+    vertex(x, y);
     endShape();
     beginShape();
     points_index++;
@@ -189,9 +228,8 @@ void draw() {
     endShape();
     
     if (split_pdfs && actual_vertices_drawn % 300000 == 0 && song_data_index != 0) {
-      int percent_drawn = (actual_vertices_drawn / (points.size() * num_interpolated_points)) * 100;
-      int percent_drawn = (actual_vertices_drawn / (points.length * 2)) * 100;
-      println("New file " + base_filename + (files_created) + ".pdf at total vertices drawn " + actual_vertices_drawn + "(" + percent_drawn + "%)");
+      int percent_drawn = (actual_vertices_drawn / (total_points_to_plot)) * 100;
+      println("New file " + base_filename + (files_created) + ".pdf at " + percent_drawn + "% of plottable points plotted");
       endRecord();
       beginRecord(PDF, base_filename + (files_created++) + ".pdf");
       background(255);
@@ -212,23 +250,27 @@ void draw() {
   float diff_y = -1 * (next_y - y);
   float angle = atan2(diff_y, diff_x);
 
-  // An extra bounds check to make sure this set of interpolated points between two coords won't put us over our song data size.
-  // Have to check instead of including in initial draw() bounds checks because we don't know num_interpolated_points until now
-  int num_interpolated_points = (int)Math.floor(point_distance / distance_between_points);
-  if (song_data_index + num_interpolated_points * song_data_increment > song_data_size) {
-    finishAndExit();
-    return;
+  int num_interpolated_points;
+  if (mode == CutMode.MILLING) {
+    // Plot a single point right at the actual coordinates for milling. We never interpolate when milling.
+    num_interpolated_points = 1;
+  } else {
+    // An extra bounds checkto make sure this set of interpolated points between two coords won't put us over our song data size.
+    // Have to check instead of including in initial draw() bounds checks because we don't know num_interpolated_points until now
+    num_interpolated_points = (int)Math.floor(point_distance / distance_between_points);
+    if (song_data_index + num_interpolated_points * song_data_increment > song_data_size) {
+      finishAndExit();
+      return;
+    }
   }
   
   // Interpolate the line between the two points given to us from the RShape to pack sound data tighter.
-  // In theory this should be constant but there's a weird thing where every 5 to 10 (not sure) RShape points is
-  // not spaced at the set polygonizerLength of 1.
-  // TODO small perf improvement making num_interpolated_points power of 2 and shifting here
+  // In theory this should be constant but the points generated by RShape are not alwasys spaced uniformly.
   float x_step_length = diff_x / num_interpolated_points;
   float y_step_length = diff_y / num_interpolated_points;
   for (int i = 0; i < num_interpolated_points; i++) {
     // Base point (x/y) + the interpolated distance straight on the line to the next point + 
-    //the song data x/y normalized to the overall angle between RShape points    
+    // the song data x/y normalized to the overall angle between RShape points    
     float adj_x = x + (i * x_step_length) + (song_data[song_data_index] * sin(angle));
     float adj_y = y - (i * y_step_length) + (song_data[song_data_index] * cos(angle));
     
@@ -240,7 +282,7 @@ void draw() {
 }
 
 float[] process_audio_text_file(String input_filename) {
-    // Load full comma-delimeted file - no line breaks so just grab the first index for everthing
+    // Load full comma-delimited file - no line breaks so just grab the first index for everthing
     String raw_string_data_array[] = loadStrings(input_filename);
     String raw_string_data  = raw_string_data_array[0];
     float audio_data[] = float(split(raw_string_data, ','));
