@@ -2,12 +2,12 @@ import processing.pdf.*;
 import processing.svg.*;
 
 static int PX_PER_IN = 72;                  // Scale factor of vectors, default 72 dpi (not sure about this one)
-static int width_in = 36;
-static int height_in = 24;
+static int width_in = 72;
+static int height_in = 48;
 static float mill_tip_diameter_in = 0.19685;
 static int side_buffer_in = 2;
-static int vertical_buffer_in = 4;
-static int num_lines = 10;
+static int vertical_buffer_in = 2;
+static int num_lines = 20;
 
 static int width_px = width_in * PX_PER_IN;
 static int height_px = height_in * PX_PER_IN;
@@ -16,7 +16,7 @@ static int side_buffer_px = side_buffer_in * PX_PER_IN;
 static int vertical_buffer_px = vertical_buffer_in * PX_PER_IN;
 
 void setup() {
-  size(2592, 1728);
+  size(5184, 3456);
   beginRecord(SVG, "test_horizontal_lines.svg");
   background(255);
   beginShape();
