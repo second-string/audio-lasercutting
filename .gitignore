@@ -1,7 +1,7 @@
 # Data files that can be re[downloaded|produced].
 # Excluding song_data should cover pretty much all of them but include the filetypes for completeness sake
 song_data/
-*.txt
+txt_to_*/*.txt
 *.pdf
 *.mp3
 *.aup
