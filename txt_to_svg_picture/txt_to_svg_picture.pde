@@ -28,7 +28,7 @@ static float milling_waveform_amplitude_pixels = 100.0;
 static int milling_width_in = 60;
 static int milling_height_in = 35;
 static float milling_stroke_weight = mill_tip_diameter_px;
-static float milling_distance_between_points = -1;    // unused for milling
+static float milling_distance_between_points = 6;
 static int milling_long_jump_threshold_px = PX_PER_IN;
 
 // Laser cutting
@@ -139,20 +139,36 @@ void setup () {
   RG.setPolygonizerLength(1);
   points_full = svg_shape.getPoints();
 
-  // Count up how many points we'll plot in this design so we can skip the correct number of song data points each subsequent point plot
+  // Count up how many points we'll plot in this design so we can skip the correct number of song data points each subsequent point plot. For milling,
+  // this also chops out points until the distance between each stored point is >= distance_between_points (don't chop points for lasercutting since the
+  // RShape points will always be more spread than we want, so we always interpolate during plotting for those).
   if (mode == CutMode.MILLING) {
-    // There is zero interpolation that happens in milling mode - we take points OUT of the shape data to make sure stuff is spaced out enough
-    // TODO :: remove points intelligently based on point-to-point distance instead of just yanking points every X initial points
-    for (int i = 0; i < points_full.length; i += 2) {
-    //for (int i = 0; i < points_full.length; i += 1) {
-      points.add(points_full[i]);
+    // Chop out svg points until the distance between the last saved point and the next available point is >= our distance_between_points minimum.
+    // This is a blunt implementation where we don't care about exact point distances, just that it's over our distance_between_points threshold.
+    // See svg_milling_point_distance_distributions dir for difference in point distributions before/after this change. tl;dr, all stored points were w/in 2px of 6 for the
+    // two designs tested
+    int stored_points_index = 0;
+    points.add(points_full[0]);
+    for (int i = 1; i < points_full.length - 1; i++) {
+        RPoint base_point = points.get(stored_points_index);
+        float x = base_point.x;
+        float y = base_point.y;
+        float next_x = points_full[i].x;
+        float next_y = points_full[i].y;
+        float point_distance = distance_between_points(next_x, next_y, x, y);
+
+        // Only add point if total distance between last accepted point and this one is greater than our min point-to-point distance
+        if (point_distance > distance_between_points) {
+          points.add(points_full[i]);
+          stored_points_index++;
+        }
     }
 
     total_points_to_plot = points.size();
   } else {
     // Add every point received from shape to points_full. Loop calculations are to determine how many
-    // total points will be plotted with varying interpolation sizes. points_full used for logic/access
-    // since linear array access is faster
+    // total points will be plotted with varying interpolation sizes. Actual interpolation happens for each point pair
+    // every draw loop iteration (we could do it here and it'd probably a bit more efficient but ¯\_(ツ)_/¯.
     for (int i = 0; i < points_full.length - 1; i++) {
       // Add to main points array before anything else
       RPoint point = points_full[i];
