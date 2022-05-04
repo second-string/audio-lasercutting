@@ -14,16 +14,16 @@
   import processing.pdf.*;
 
   //parameters
-  String filename = "terrapin_station_live_at_red_rocks.txt";//generate a txt file of your waveform using python wav to txt, and copy the file name here
+  String filename = "innerbloom.txt";//generate a txt file of your waveform using python wav to txt, and copy the file name here
   float rpm = 45.0;//33.3,45,78
   float samplingRate = 48000;//sampling rate of incoming audio
   float dpi = 240;//dpi of cutter
   int cutterWidth = 12;//width of laser cutter bed in inches
   int cutterHeight = 12;//height of laser cutter bed in inches
   float amplitude = 30;//in pixels
-  float spacing = 40;//space between grooves (in pixels)
+  float spacing = 45;//space between grooves (in pixels)
   float minDist = 0.1;//min pixel spacing between points in vector path (to prevent cutter from stalling)
-  float thetaIter = 3800;//how many values of theta per cycle
+  float thetaIter = 3280;//how many values of theta per cycle
   float diameter = 11;//diameter of record in inches
   float innerHole = 0.1;//diameter of center hole in inches
   float innerRad = 0.25;//radius of innermost groove in inches
