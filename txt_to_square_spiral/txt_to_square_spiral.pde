@@ -6,7 +6,7 @@ public static final int PX_PER_IN = 72;  // Scale factor of vectors, default 72 
 // ---------- PER-SONG PARAMS ----------
 // You will need to change or tweak these for every new song cut you're doing
 
-String input_filename = "nothing_is_something_worth_doing.txt";
+String input_filename = "innerbloom.txt";
 float waveform_amplitude_pixels = 7; // Total amplitude of audio waveform to scale to
 float distance_between_points_pixels = 0.5;   // Number of pixels between each vertex plotted
 boolean include_cutlines = true;
@@ -71,6 +71,8 @@ void setup() {
     println("Total count of song data points: " + song_data_length);
     
     // Number of entries to move in the data array each time we go to draw another point
+    // Add a fractional multiple to total_points_to_plot to end spirals earlier for inner symbols. This is really hacky and imprecise.
+    // i.e. (total_points_to_plot * 14 / 15)
     int data_increment = (int)Math.floor(song_data_length / total_points_to_plot);
     println("Skipping every " + data_increment + " song data points to fit in available plottable points");
 
@@ -174,9 +176,11 @@ void setup() {
           // Check out index each iteration to make sure we don't overflow since we increment in here but the outer while loop has the guard
           if (data_index >= song_data.length) {
             // Finish the row by looping back to beginning of song data so we don't have an ugly flat line or nothing at all
-            //vertex(x_pos, current_draw_y_offset);
-            //continue;
             index_to_use = data_index - song_data.length;
+
+            // Comment above line and uncomment this one to finish last side by just repeating the last point for a straight line. Useful when start of song is jarring
+            // and end of song is flat, so we don't transition into a lot of noise midway through the last side
+            //data_index -= data_increment;
           } else {
             index_to_use = data_index;
           } 
