@@ -9,9 +9,9 @@ public enum CutMode {
 
 // ---------- PER-SONG PARAMS ----------
 // Change these to match your files and cut type
-String song_data_filename = "notion.txt";
-String shape_filename = "wave_bumps_proto_2.svg";
-CutMode mode = CutMode.MILLING;
+String song_data_filename = "nothing_can_change_this_love+twisting_the_night_away.txt";
+String shape_filename = "rotunda_edited.svg";
+CutMode mode = CutMode.LASER_CUTTING;
 boolean split_pdfs = false;            // Set to true to create multiple files w/ pieces of image instead of one monster. Useful for illustrator or some laser cutters that barf on files w/ ton of vertices in it
 // ---------- END PER-SONG PARAMS ---------
 
@@ -32,11 +32,11 @@ static float milling_distance_between_points = 6;
 static int milling_long_jump_threshold_px = PX_PER_IN;
 
 // Laser cutting
-static float laser_cutting_waveform_amplitude_pixels = 6.0;
+static float laser_cutting_waveform_amplitude_pixels = 8.0;
 static int laser_cutting_width_in = 12;
 static int laser_cutting_height_in = 12;
 static float laser_cutting_stroke_weight = 0.4;
-static float laser_cutting_distance_between_points = 0.3;
+static float laser_cutting_distance_between_points = 0.4;
 static int laser_cutting_long_jump_threshold_px = 5;
 // ---------- END CONSTANTS ----------
 
@@ -106,12 +106,9 @@ void setup () {
   //assert(width_in == 36);
   //assert(height_in == 24);
   //size(3456, 2304);
-  assert(width_in == 60);
-  assert(height_in == 35);
-  size(4320, 2520);
-  //assert(width_in == 13);
-  //assert(height_in == 13);
-  //size(936, 936);
+  assert(width_in == 12);
+  assert(height_in == 12);
+  size(864, 864);
 
   // Pull in song data in txt form and normalize it
   // Intake csv text, tranform to floats and normalize based on max value and waveform amplitude setting
@@ -132,9 +129,14 @@ void setup () {
     println("WARNING: input svg not square, scaling max side length of " + max_side_length + "px to canvas side length of " + (width_in * PX_PER_IN) + "px");
   }
 
-  // width_in * PX_PER_IN is scaling to same value we passed into size(x,y) at the beginning of setup()
-  // TODO :: this scaling is what's pushing our image out of frame every time. Either adjust document dims or this scaling factor
-  svg_shape.scale((width_in * PX_PER_IN) / max_side_length);
+  // Scale the SVG so it's longest side matches longest side of the canvas. This fucks with where it actually is on the canvas, so get
+  // it's centerpoint and translate it so that matches the canvas centerpoint.
+  // (width_in * PX_PER_IN is scaling to same value we passed into size(x,y) at the beginning of setup(),
+  // add buffer of 2x amplitude before scaling to make sure no waveform spikes are cut off on edge)
+  svg_shape.scale(((width_in * PX_PER_IN) - waveform_amplitude_pixels * 2) / max_side_length);
+  RPoint top_left = svg_shape.getTopLeft();
+  RPoint center = new RPoint(top_left.x + (svg_shape.getWidth() / 2), top_left.y + (svg_shape.getHeight() / 2));
+  svg_shape.translate((width_in * PX_PER_IN) / 2 - center.x, (height_in * PX_PER_IN) / 2 - center.y);
   
   RG.setPolygonizerLength(1);
   points_full = svg_shape.getPoints();
