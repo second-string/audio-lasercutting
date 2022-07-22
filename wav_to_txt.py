@@ -41,7 +41,8 @@ numframes = w.getnframes()
 
 frame = w.readframes(numframes)#w.getnframes()
 
-frameInt = map(ord, list(frame))#turn into array
+frameInt = map(int, list(frame))#turn into array
+frameInt = list(frameInt)
 
 #separate left and right channels and merge bytes
 frameOneChannel = [0]*numframes#initialize list of one channel of wave
