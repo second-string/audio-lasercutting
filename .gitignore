@@ -1,9 +1,16 @@
 # Data files that can be re[downloaded|produced].
-# Excluding song_data should cover pretty much all of them but include the filetypes for completeness sake
-song_data/
+# Excluding data_songs should cover pretty much all of them but include the filetypes for completeness sake
+data_songs/
 txt_to_*/*.txt
-*.pdf
-*.mp3
+txt_to_*/*.svg
+txt_to_*/*.pdf
+txt_to_*/*.mp3
+
+
+# Special case these to keep the test horizontal lines data around since they don't fall into the above txt_to_* catch-alls
+test_horizontal_lines/*.svg
+test_horizontal_lines/*.pdf
+
 *.aup
 *.au
 .DS_Store
@@ -12,4 +19,3 @@ txt_to_*/*.txt
 # exporting as wav but these files are straight out too big to include in a repo at scale
 *.wav
 
-txt_to_*/*.svg
